@@ -1,0 +1,53 @@
+services:
+  primary:
+    image: mariadb:${MARIADB_VERSION:-11.4}
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+      MARIADB_DATABASE: appdb
+    command: ["--server-id=1", "--log-bin=mariadb-bin", "--binlog-format=ROW"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 40
+
+  replica:
+    build:
+      context: ../..
+      dockerfile: tests/integration/docker/replica.Dockerfile
+      args:
+        MARIADB_VERSION: ${MARIADB_VERSION:-11.4}
+    depends_on:
+      primary:
+        condition: service_healthy
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+    command: ["--server-id=2", "--log-bin=mariadb-bin", "--binlog-format=ROW", "--relay-log=relay-bin"]
+    volumes:
+      - ./config:/mbkeeper-config:ro
+      - ssh_keys:/shared-ssh-keys
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 40
+
+  store:
+    build:
+      context: .
+      dockerfile: docker/sshd.Dockerfile
+    volumes:
+      - ssh_keys:/shared-ssh-keys:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "22"]
+      interval: 2s
+      timeout: 5s
+      retries: 40
+
+  restore-target:
+    image: mariadb:${MARIADB_VERSION:-11.4}
+    entrypoint: ["sleep", "infinity"]
+    profiles: ["restore"]
+
+volumes:
+  ssh_keys:

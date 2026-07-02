@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  unit:
+    name: unit (python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package with dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Lint (ruff check)
+        run: ruff check .
+
+      - name: Format check (ruff format)
+        run: ruff format --check .
+
+      - name: Run unit tests
+        run: pytest tests/unit -v
+
+  integration:
+    name: integration (mariadb ${{ matrix.mariadb-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mariadb-version: ["10.11", "11.4"]
+    env:
+      MARIADB_VERSION: ${{ matrix.mariadb-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run integration scenarios
+        run: tests/integration/run.sh
+
+      - name: Upload container logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-logs-${{ matrix.mariadb-version }}
+          path: /tmp/mbkeeper-it-logs/compose.log
+          if-no-files-found: ignore
