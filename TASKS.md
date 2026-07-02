@@ -15,7 +15,7 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 - [x] locking.py(flock 非ブロッキング単一実行ロック)
 - [x] ユニットテスト雛形(test_config.py, test_config_load.py, test_locking.py)
 - [x] Makefile(test/lint/integration)
-- [ ] dev ブランチ作成、初回コミット
+- [x] dev ブランチ作成、初回コミット
 
 ## M2: 取得と local 配置
 
