@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tooling artifacts
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Scratch / intermediate files (per project conventions)
+tmp/
+.claude/tmp/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Integration test runtime artifacts (never commit generated backups)
+tests/integration/.data/

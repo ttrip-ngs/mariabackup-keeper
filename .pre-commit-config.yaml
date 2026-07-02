@@ -1,0 +1,16 @@
+repos:
+  # セキュリティチェック
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+
+  # Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+# 重い処理（フルテスト、MariaDBマトリクス結合試験）はGitHub Actionsで実行
