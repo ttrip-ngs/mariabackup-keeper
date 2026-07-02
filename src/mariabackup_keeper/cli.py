@@ -12,7 +12,8 @@ from mariabackup_keeper.destinations import build_destination
 from mariabackup_keeper.errors import DestinationError, KeeperError
 from mariabackup_keeper.exit_codes import ExitCode
 from mariabackup_keeper.logging_setup import get_logger, setup_logging
-from mariabackup_keeper.orchestrator import PurgeSummary
+from mariabackup_keeper.orchestrator import CheckSummary, PurgeSummary
+from mariabackup_keeper.orchestrator import check as check_pipeline
 from mariabackup_keeper.orchestrator import purge as purge_pipeline
 from mariabackup_keeper.orchestrator import run as run_pipeline
 
@@ -55,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--destination", metavar="NAME", help="Limit to this destination name."
     )
 
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Validate config and probe mariabackup, replication state, and each destination.",
+    )
+    _add_config_arg(check_parser)
+
     return parser
 
 
@@ -93,6 +100,10 @@ def main(argv: list[str] | None = None) -> int:
             return int(summary.exit_code)
         if args.command == "list":
             return _cmd_list(config, args.destination)
+        if args.command == "check":
+            summary = check_pipeline(config)
+            _print_check_summary(summary)
+            return int(ExitCode.SUCCESS) if summary.ok else int(ExitCode.PRECONDITION_FAILED)
     except KeeperError as exc:
         logger.error(str(exc))
         return int(exc.exit_code)
@@ -112,6 +123,13 @@ def _print_purge_summary(summary: PurgeSummary, dry_run: bool) -> None:
             print(f"[{result.name}] {verb}: {', '.join(result.deleted)}")
         else:
             print(f"[{result.name}] nothing to purge (kept {len(result.kept)} generations)")
+
+
+def _print_check_summary(summary: CheckSummary) -> None:
+    for item in summary.items:
+        status = "OK" if item.ok else "FAIL"
+        detail = f": {item.detail}" if item.detail else ""
+        print(f"[{status}] {item.name}{detail}")
 
 
 def _cmd_list(config: Config, destination_filter: str | None) -> int:

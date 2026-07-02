@@ -39,9 +39,12 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 
 ## M4: 前提チェックとフック
 
-- [ ] replication.py(SHOW REPLICA STATUS パース、lag チェック)
-- [ ] check サブコマンド
-- [ ] hooks.py(pre_backup/post_backup/pre_purge/post_run)
+- [x] replication.py(SHOW REPLICA STATUS パース、lag チェック、mode=off かつ
+      max_lag_seconds=0 のときは client を一切呼ばない遅延評価)
+- [x] check サブコマンド(mariabackup / replication / 各保管先の疎通確認)
+- [x] hooks.py(pre_backup/post_backup/pre_purge/post_run。pre_backup のみ
+      失敗で実行中断、他は警告ログのみ)
+- [x] meta.json の mariadb_version を replication.py 経由で取得(mode=off 時は空文字のまま)
 
 ## M5: 結合試験と CI
 

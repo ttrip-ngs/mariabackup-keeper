@@ -1,11 +1,11 @@
-"""The `run` pipeline: lock -> backup+prepare -> store -> purge.
-
-Replication preconditions and hooks (M4) are added on top of this pipeline
-in a later milestone without changing this module's contract.
+"""The `run` pipeline: lock -> precondition -> hooks -> backup+prepare ->
+store -> purge. Also exposes `purge` (standalone `mbkeeper purge`) and
+`check` (standalone `mbkeeper check`) built from the same building blocks.
 """
 
 from __future__ import annotations
 
+import json
 import shutil
 import socket
 from dataclasses import dataclass, field
@@ -16,8 +16,9 @@ from mariabackup_keeper import __version__
 from mariabackup_keeper.backup import MariabackupRunner
 from mariabackup_keeper.config import Config, DestinationConfig
 from mariabackup_keeper.destinations import build_destination
-from mariabackup_keeper.errors import BackupError, DestinationError
+from mariabackup_keeper.errors import BackupError, DestinationError, PreconditionError
 from mariabackup_keeper.exit_codes import ExitCode
+from mariabackup_keeper.hooks import run_hook
 from mariabackup_keeper.locking import acquire_lock
 from mariabackup_keeper.logging_setup import get_logger
 from mariabackup_keeper.manifest import (
@@ -27,6 +28,7 @@ from mariabackup_keeper.manifest import (
     generate_backup_id,
     write_meta,
 )
+from mariabackup_keeper.replication import ReplicationState, check_replication
 from mariabackup_keeper.retention import select_purge
 
 
@@ -59,6 +61,19 @@ class PurgeSummary:
     results: tuple[DestinationPurgeResult, ...] = ()
 
 
+@dataclass(frozen=True)
+class CheckItem:
+    name: str
+    ok: bool
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class CheckSummary:
+    ok: bool
+    items: tuple[CheckItem, ...]
+
+
 def run(config: Config, now: datetime | None = None) -> RunSummary:
     logger = get_logger()
     now = now or datetime.now(timezone.utc)
@@ -66,6 +81,9 @@ def run(config: Config, now: datetime | None = None) -> RunSummary:
     with acquire_lock(config.lock.file):
         backup_id = generate_backup_id(config.backup.name_prefix, now)
         logger.info(f"starting run backup_id={backup_id}")
+
+        replication_state = _check_replication_if_configured(config)
+        run_hook(config.hooks.pre_backup, logger, fail_fast=True)
 
         _cleanup_stale_work_dir(config.backup.work_dir, keep_id=backup_id, logger=logger)
         target_dir = config.backup.work_dir / backup_id
@@ -79,7 +97,11 @@ def run(config: Config, now: datetime | None = None) -> RunSummary:
                 runner.run_prepare(target_dir)
         except BackupError as exc:
             logger.error(f"backup failed: {exc}")
-            return RunSummary(backup_id=backup_id, exit_code=ExitCode.BACKUP_FAILED, error=str(exc))
+            return _finish(
+                RunSummary(backup_id=backup_id, exit_code=ExitCode.BACKUP_FAILED, error=str(exc)),
+                config,
+                logger,
+            )
         finished_at = datetime.now(timezone.utc)
 
         write_meta(
@@ -92,13 +114,15 @@ def run(config: Config, now: datetime | None = None) -> RunSummary:
                 started_at=started_at.isoformat(),
                 finished_at=finished_at.isoformat(),
                 hostname=socket.gethostname(),
-                mariadb_version="",
+                mariadb_version=replication_state.server_version,
                 mariabackup_version=runner.get_version(),
                 prepared=config.backup.prepare,
                 size_bytes=directory_size_bytes(target_dir),
                 tool_version=f"mariabackup-keeper {__version__}",
             ),
         )
+
+        run_hook(config.hooks.post_backup, logger)
 
         outcomes = _store_to_destinations(config, target_dir, backup_id, logger)
         succeeded = [o for o in outcomes if o.stored]
@@ -109,14 +133,19 @@ def run(config: Config, now: datetime | None = None) -> RunSummary:
                 f"all destinations failed for backup_id={backup_id}; "
                 f"work_dir preserved: {target_dir}"
             )
-            return RunSummary(
-                backup_id=backup_id,
-                exit_code=ExitCode.ALL_DESTINATIONS_FAILED,
-                destination_outcomes=tuple(outcomes),
+            return _finish(
+                RunSummary(
+                    backup_id=backup_id,
+                    exit_code=ExitCode.ALL_DESTINATIONS_FAILED,
+                    destination_outcomes=tuple(outcomes),
+                ),
+                config,
+                logger,
             )
 
         shutil.rmtree(target_dir, ignore_errors=True)
 
+        run_hook(config.hooks.pre_purge, logger)
         purge_had_error = _purge_stored_destinations(config, succeeded, backup_id, now, logger)
 
         if failed:
@@ -127,9 +156,40 @@ def run(config: Config, now: datetime | None = None) -> RunSummary:
             exit_code = ExitCode.SUCCESS
 
         logger.info(f"run complete backup_id={backup_id} exit_code={int(exit_code)}")
-        return RunSummary(
-            backup_id=backup_id, exit_code=exit_code, destination_outcomes=tuple(outcomes)
+        return _finish(
+            RunSummary(
+                backup_id=backup_id, exit_code=exit_code, destination_outcomes=tuple(outcomes)
+            ),
+            config,
+            logger,
         )
+
+
+def _check_replication_if_configured(config: Config) -> ReplicationState:
+    """Only touches the mariadb client when the user actually opted into a
+    replication requirement -- mode="off" with no lag ceiling must not force
+    a DB connection just to populate meta.json's mariadb_version field.
+    """
+    if config.replication.mode == "off" and config.replication.max_lag_seconds == 0:
+        return ReplicationState(is_replica=False, lag_seconds=None, server_version="")
+    return check_replication(config.backup, config.replication)
+
+
+def _finish(summary: RunSummary, config: Config, logger) -> RunSummary:
+    """Runs post_run (always, whatever the outcome) then returns the summary unchanged."""
+    payload = json.dumps(
+        {
+            "backup_id": summary.backup_id,
+            "exit_code": int(summary.exit_code),
+            "destinations": [
+                {"name": o.name, "stored": o.stored, "error": o.error}
+                for o in summary.destination_outcomes
+            ],
+            "error": summary.error,
+        }
+    )
+    run_hook(config.hooks.post_run, logger, stdin_data=payload)
+    return summary
 
 
 def purge(
@@ -155,6 +215,39 @@ def purge(
 
         exit_code = ExitCode.PURGE_FAILED if had_error else ExitCode.SUCCESS
         return PurgeSummary(exit_code=exit_code, results=tuple(results))
+
+
+def check(config: Config) -> CheckSummary:
+    logger = get_logger()
+    items: list[CheckItem] = []
+
+    runner = MariabackupRunner(config.backup, config.replication, logger)
+    version = runner.get_version()
+    items.append(
+        CheckItem(name="mariabackup", ok=not version.startswith("unknown"), detail=version)
+    )
+
+    try:
+        state = check_replication(config.backup, config.replication)
+        detail = (
+            f"is_replica={state.is_replica} lag_seconds={state.lag_seconds} "
+            f"server_version={state.server_version}"
+        )
+        items.append(CheckItem(name="replication", ok=True, detail=detail))
+    except PreconditionError as exc:
+        items.append(CheckItem(name="replication", ok=False, detail=str(exc)))
+
+    for dest_config in config.destinations:
+        destination = build_destination(dest_config, config.transfer)
+        try:
+            destination.check()
+            items.append(CheckItem(name=f"destination:{dest_config.name}", ok=True))
+        except DestinationError as exc:
+            items.append(
+                CheckItem(name=f"destination:{dest_config.name}", ok=False, detail=str(exc))
+            )
+
+    return CheckSummary(ok=all(item.ok for item in items), items=tuple(items))
 
 
 def _purge_one_destination(
