@@ -48,9 +48,12 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 
 ## M5: 結合試験と CI
 
-- [ ] docker-compose.yml(primary/replica/store/restore-target)
-- [ ] tests/integration/run.sh、scenarios 3 本
-- [ ] .github/workflows/ci.yml(unit + integration マトリクス)
+- [x] docker-compose.yml(primary/replica/store/restore-target)
+- [x] tests/integration/run.sh、scenarios 3 本
+- [x] .github/workflows/ci.yml(unit + integration マトリクス)
+- [ ] **未検証**: この開発環境に Docker が無く実行できていない。初回の
+      GitHub Actions 実行、またはローカルに Docker が入った環境での
+      `make integration` 実行で動作確認が必要(詳細は memo/history/005 参照)
 
 ## M6: ドキュメント
 

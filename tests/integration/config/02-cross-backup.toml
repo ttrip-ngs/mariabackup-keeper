@@ -1,0 +1,29 @@
+schema_version = 1
+
+[backup]
+work_dir = "/var/lib/mbkeeper/work"
+mariabackup_path = "mariabackup"
+defaults_extra_file = "/mbkeeper-config/client.cnf"
+
+[transfer]
+on_destination_failure = "continue"
+retries = 1
+
+[[destinations]]
+name = "local"
+type = "local"
+path = "/var/backups/mbkeeper/s02-local"
+keep = 7
+
+[[destinations]]
+name = "store"
+type = "ssh"
+host = "store"
+user = "backup"
+path = "/backups"
+ssh_key = "/shared-ssh-keys/id_ed25519"
+ssh_options = ["-o", "StrictHostKeyChecking=accept-new"]
+keep = 7
+
+[lock]
+file = "/run/mbkeeper/mbkeeper.lock"

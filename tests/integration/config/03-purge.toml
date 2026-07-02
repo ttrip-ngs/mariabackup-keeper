@@ -1,0 +1,15 @@
+schema_version = 1
+
+[backup]
+work_dir = "/var/lib/mbkeeper/work"
+mariabackup_path = "mariabackup"
+defaults_extra_file = "/mbkeeper-config/client.cnf"
+
+[[destinations]]
+name = "local"
+type = "local"
+path = "/var/backups/mbkeeper/s03"
+keep = 2
+
+[lock]
+file = "/run/mbkeeper/mbkeeper.lock"
