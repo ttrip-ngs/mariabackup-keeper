@@ -19,13 +19,14 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 
 ## M2: 取得と local 配置
 
-- [ ] backup.py(MariabackupRunner: argv 組み立て、成否判定、timeout、ログ保存)
-- [ ] manifest.py(世代 ID 採番、meta.json 読み書き)
-- [ ] destinations/base.py(Destination ABC、StoredBackup dataclass)
-- [ ] destinations/local.py
-- [ ] orchestrator.py(run パイプライン正常系: lock→precondition→backup→prepare→store→purge)
-- [ ] cli.py(run/purge/list/check サブコマンド、--version)
-- [ ] `mbkeeper run` がローカル 1 保管先で通ることを確認
+- [x] backup.py(MariabackupRunner: argv 組み立て、成否判定、timeout、ログ保存)
+- [x] manifest.py(世代 ID 採番、meta.json 読み書き)
+- [x] destinations/base.py(Destination ABC、StoredBackup dataclass)
+- [x] destinations/local.py
+- [x] orchestrator.py(run パイプライン正常系: lock→backup→prepare→store。purge は M3、
+      precondition/hooks は M4 で追加)
+- [x] cli.py(run サブコマンド、--version。purge/list/check は該当機能の実装時に追加)
+- [x] `mbkeeper run` がローカル 1 保管先で通ることを確認(手動スモークテストで確認済み)
 
 ## M3: クロスバックアップと purge
 
