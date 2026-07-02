@@ -36,4 +36,4 @@ def build_destination(config: DestinationConfig, transfer: TransferConfig) -> De
     return destination_cls.from_config(config, transfer)
 
 
-from mariabackup_keeper.destinations import local  # noqa: E402,F401
+from mariabackup_keeper.destinations import local, ssh  # noqa: E402,F401

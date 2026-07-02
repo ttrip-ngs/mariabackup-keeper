@@ -5,7 +5,7 @@ from fakes import succeeding_mariabackup
 from mariabackup_keeper.cli import main
 
 
-def _write_config(tmp_path: Path, mariabackup_path: str) -> Path:
+def _write_config(tmp_path: Path, mariabackup_path: str, keep: int = 5) -> Path:
     config_path = tmp_path / "config.toml"
     config_path.write_text(f"""
 schema_version = 1
@@ -18,7 +18,7 @@ mariabackup_path = "{mariabackup_path}"
 name = "local"
 type = "local"
 path = "{tmp_path / "store"}"
-keep = 5
+keep = {keep}
 
 [lock]
 file = "{tmp_path / "mbkeeper.lock"}"
@@ -54,3 +54,50 @@ def test_main_no_subcommand_is_usage_error(capsys):
         main([])
 
     assert exc_info.value.code == 2
+
+
+def test_main_list_reports_generations(tmp_path: Path, capsys):
+    config_path = _write_config(tmp_path, succeeding_mariabackup(tmp_path))
+    main(["run", "-c", str(config_path)])
+
+    exit_code = main(["list", "-c", str(config_path)])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "[local]" in output
+    assert "complete" in output
+
+
+def test_main_list_unknown_destination_filter_shows_nothing(tmp_path: Path, capsys):
+    config_path = _write_config(tmp_path, succeeding_mariabackup(tmp_path))
+
+    exit_code = main(["list", "-c", str(config_path), "--destination", "does-not-exist"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_main_purge_deletes_beyond_keep(tmp_path: Path, capsys):
+    config_path = _write_config(tmp_path, succeeding_mariabackup(tmp_path), keep=1)
+    main(["run", "-c", str(config_path)])
+    (tmp_path / "store" / "full-00000101T000000Z").mkdir(parents=True)
+    (tmp_path / "store" / "full-00000101T000000Z" / "meta.json").write_text("{}")
+
+    exit_code = main(["purge", "-c", str(config_path)])
+
+    assert exit_code == 0
+    assert not (tmp_path / "store" / "full-00000101T000000Z").exists()
+    assert "deleted" in capsys.readouterr().out
+
+
+def test_main_purge_dry_run_does_not_delete(tmp_path: Path, capsys):
+    config_path = _write_config(tmp_path, succeeding_mariabackup(tmp_path), keep=1)
+    main(["run", "-c", str(config_path)])
+    (tmp_path / "store" / "full-00000101T000000Z").mkdir(parents=True)
+    (tmp_path / "store" / "full-00000101T000000Z" / "meta.json").write_text("{}")
+
+    exit_code = main(["purge", "-c", str(config_path), "--dry-run"])
+
+    assert exit_code == 0
+    assert (tmp_path / "store" / "full-00000101T000000Z").exists()
+    assert "would delete" in capsys.readouterr().out
