@@ -99,3 +99,18 @@ def test_run_cleans_stale_work_dir_entries_from_a_previous_crashed_run(tmp_path:
     run(config, now=later)
 
     assert not stale.exists()
+
+
+def test_run_purges_generations_beyond_keep_after_successful_store(tmp_path: Path):
+    config = _build_config(tmp_path, succeeding_mariabackup(tmp_path), keep=1)
+    setup_logging(config.logging)
+    run(config, now=_NOW)
+    first_backup_id = _EXPECTED_BACKUP_ID
+    assert (tmp_path / "store" / first_backup_id).exists()
+
+    later = datetime(2026, 7, 2, 19, 0, 0, tzinfo=timezone.utc)
+    summary = run(config, now=later)
+
+    assert summary.exit_code == ExitCode.SUCCESS
+    assert not (tmp_path / "store" / first_backup_id).exists()
+    assert (tmp_path / "store" / summary.backup_id).exists()

@@ -30,10 +30,12 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 
 ## M3: クロスバックアップと purge
 
-- [ ] destinations/ssh.py(rsync 経由、partial→rename プロトコル)
-- [ ] retention.py(select_purge 純粋関数)
-- [ ] on_destination_failure(continue/abort)の実装
-- [ ] purge/list サブコマンドの実装
+- [x] destinations/ssh.py(rsync 経由、partial→rename プロトコル)
+- [x] retention.py(select_purge 純粋関数)
+- [x] on_destination_failure(continue/abort)の実装(M2 で実装済みのロジックを維持。
+      ssh 保管先追加後の複数保管先構成での検証は M5 の結合試験で実施)
+- [x] purge/list サブコマンドの実装
+- [x] run パイプラインへの自動 purge 組み込み(store 成功した保管先のみ対象)
 
 ## M4: 前提チェックとフック
 

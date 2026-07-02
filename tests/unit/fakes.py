@@ -30,3 +30,30 @@ def null_logger() -> logging.Logger:
     logger.addHandler(logging.NullHandler())
     logger.propagate = False
     return logger
+
+
+def make_fake_ssh_bin_dir(tmp_path: Path) -> Path:
+    """A fake `ssh` that runs the "remote" command locally instead of over the
+    network. Prepend the returned directory to PATH so subprocess.run(["ssh", ...])
+    resolves to it. Only exercises the ssh-invocation wiring (mkdir/test/rm/mv,
+    and rsync's own -e transport); it is not a substitute for the real
+    ssh+rsync integration coverage in tests/integration.
+    """
+    bin_dir = tmp_path / "fake-bin"
+    bin_dir.mkdir(exist_ok=True)
+    script = bin_dir / "ssh"
+    script.write_text(f"""#!{sys.executable}
+import subprocess
+import sys
+
+argv = sys.argv[1:]
+host_idx = next(i for i, a in enumerate(argv) if "@" in a)
+remote = argv[host_idx + 1:]
+if len(remote) == 1:
+    result = subprocess.run(remote[0], shell=True)
+else:
+    result = subprocess.run(remote)
+sys.exit(result.returncode)
+""")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return bin_dir
