@@ -57,5 +57,11 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 
 ## M6: ドキュメント
 
-- [ ] README.md(商標免責・責任分界)
-- [ ] docs/design.md、configuration.md、exit-codes.md、operations.md
+- [x] README.md(商標免責・責任分界)
+- [x] docs/design.md、configuration.md、exit-codes.md、operations.md
+
+## 既知の残課題
+
+- Docker 結合試験(M5)がこの環境では未実行。次回、Docker が使える環境
+  または GitHub Actions 上で最初の実行確認が必要(詳細は
+  memo/history/005 参照)
