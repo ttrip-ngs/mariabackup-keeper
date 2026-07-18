@@ -15,9 +15,9 @@ jobs:
       matrix:
         python-version: ["3.9", "3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -43,14 +43,14 @@ jobs:
     env:
       MARIADB_VERSION: ${{ matrix.mariadb-version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run integration scenarios
         run: tests/integration/run.sh
 
       - name: Upload container logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: compose-logs-${{ matrix.mariadb-version }}
           path: /tmp/mbkeeper-it-logs/compose.log

@@ -55,11 +55,32 @@ run-container.sh 作成時に必要だった調整(このコミットに含む):
   書き込み可能パスへコピーしてからインストール
 - sshd はデーモンを別途 `container exec -d` で起動(compose の常駐前提が無い)
 
-### 残る未検証
+### GitHub Actions 初回実行(2026-07-18、PR #1)で判明・修正した3件
 
-- GitHub Actions 上の Docker Compose 版(`run.sh`)の初回実行
-- MariaDB 10.11 マトリクス(古い pip の `--break-system-packages` 非対応
-  フォールバックはコードに入れてあるが、11.4 のみで実行したため未通過)
+Public リポジトリ(ttrip-ngs/mariabackup-keeper)を作成し PR #1 で CI を
+初めて回したところ、Docker Compose 版(`run.sh`)で3件の不具合が順に露見した。
+いずれも Apple Container で実環境を再現して原因を確定し、修正後に CI 全緑
+(unit 3.9/3.11/3.13 + integration MariaDB 10.11/11.4)を確認した。
+
+1. レプリケーション確立待ちが `mariadb -N ... "SHOW SLAVE STATUS\G"` を
+   使っていた。`-N`(--skip-column-names)は `\G` 縦形式では列名ラベルまで
+   抑制するため出力から `Slave_IO_Running:` の文字列が消え、
+   `grep 'Slave_IO_Running: Yes'` が永久に空振り。レプリケーションは
+   実際には起動しているのに「did not start」で exit 1 していた。→ `-N` を除去。
+2. シナリオ01のリストア先チェックサム照合が認証情報なしの `mariadb` で
+   接続し `Access denied for user 'root'@'localhost'`。リストアした datadir は
+   primary の権限情報を引き継ぐため root のパスワードが必要。→ `-uroot -ptest` を追加。
+3. MariaDB 10.11(Ubuntu 22.04)で mbkeeper が全シナリオ即
+   `executable file not found in $PATH`。pip 22.0.2 同梱の setuptools 59.6 が
+   本プロジェクトの PEP 621 `[project]` メタデータを読めず、install が中身の
+   ない `UNKNOWN-0.0.0` を黙って生成しエントリポイントを作らないため。→
+   `--break-system-packages` 付き install が失敗した場合(=22.04)に pip を
+   更新(モダンな setuptools も同時に入る)してから再 install するよう
+   `replica.Dockerfile` と `run-container.sh` を修正。24.04(11.4)は
+   `--break-system-packages` 付きが成功するので pip には触れない。
+
+あわせて CI の action を Node.js 20 廃止対応で最新メジャーへ更新
+(checkout@v7 / setup-python@v6 / upload-artifact@v7)。
 
 ## 実装したもの
 
