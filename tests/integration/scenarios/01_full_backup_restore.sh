@@ -74,7 +74,10 @@ if ! docker compose exec -T restore-target mariadb-admin ping >/dev/null 2>&1; t
   exit 1
 fi
 
-restored_checksum="$(docker compose exec -T restore-target mariadb -N -e "CHECKSUM TABLE appdb.widgets" | awk '{print $2}')"
+# The restored datadir carries the primary's grants, so root needs its
+# password here -- unlike the throwaway pre-restore image, this is a real
+# authenticated connection (a bare `mariadb` would get "Access denied").
+restored_checksum="$(docker compose exec -T restore-target mariadb -uroot -ptest -N -e "CHECKSUM TABLE appdb.widgets" | awk '{print $2}')"
 log "restored checksum: $restored_checksum"
 
 docker compose --profile restore stop restore-target >/dev/null 2>&1 || true

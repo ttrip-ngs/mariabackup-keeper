@@ -107,11 +107,16 @@ container exec "$REPLICA" bash -c '
   # pip refuses to build from a read-only source tree (it tries to touch
   # src/*.egg-info in place), so copy to a writable path first.
   cp -r /opt/mariabackup-keeper /tmp/mbkeeper-src
-  # --break-system-packages only exists on pip >= 23.0 (Debian 12/Ubuntu
-  # 24.04-era); the MariaDB 10.11 image is Ubuntu 22.04 with an older pip
-  # that rejects the unknown flag outright, so fall back without it there.
+  # MariaDB 11.4 (Ubuntu 24.04, pip 24) needs --break-system-packages and the
+  # first command succeeds. MariaDB 10.11 (Ubuntu 22.04, pip 22.0.2) rejects
+  # that flag (so it fails fast, no half-install) AND ships setuptools 59.6,
+  # too old to read this project'"'"'s PEP 621 metadata -- a plain install there
+  # silently builds an empty "UNKNOWN-0.0.0" with no mbkeeper entry point.
+  # Upgrading pip (pulls a modern setuptools; 22.04 is not externally-managed)
+  # fixes both, then the install yields a real mbkeeper on PATH.
   python3 -m pip install --break-system-packages --quiet --no-cache-dir /tmp/mbkeeper-src \
-    || python3 -m pip install --quiet --no-cache-dir /tmp/mbkeeper-src
+    || { python3 -m pip install --quiet --upgrade pip \
+         && python3 -m pip install --quiet --no-cache-dir /tmp/mbkeeper-src; }
   mkdir -p /var/lib/mbkeeper/work /var/backups/mbkeeper /run/mbkeeper /shared-ssh-keys
   if [ ! -f /shared-ssh-keys/id_ed25519 ]; then
     ssh-keygen -t ed25519 -N "" -f /shared-ssh-keys/id_ed25519 -q
