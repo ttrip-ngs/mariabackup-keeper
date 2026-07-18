@@ -71,8 +71,11 @@ docker compose exec -T replica mariadb -uroot -ptest -e "
 
 log "waiting for replication to catch up"
 for _ in $(seq 1 30); do
-  io_running="$(docker compose exec -T replica mariadb -uroot -ptest -N -e "SHOW SLAVE STATUS\G" 2>/dev/null | grep -c 'Slave_IO_Running: Yes' || true)"
-  sql_running="$(docker compose exec -T replica mariadb -uroot -ptest -N -e "SHOW SLAVE STATUS\G" 2>/dev/null | grep -c 'Slave_SQL_Running: Yes' || true)"
+  # No -N here: --skip-column-names suppresses the field-name labels in \G
+  # vertical output, so "Slave_IO_Running:" would vanish and the grep below
+  # could never match even when replication is up.
+  io_running="$(docker compose exec -T replica mariadb -uroot -ptest -e "SHOW SLAVE STATUS\G" 2>/dev/null | grep -c 'Slave_IO_Running: Yes' || true)"
+  sql_running="$(docker compose exec -T replica mariadb -uroot -ptest -e "SHOW SLAVE STATUS\G" 2>/dev/null | grep -c 'Slave_SQL_Running: Yes' || true)"
   if [ "$io_running" = "1" ] && [ "$sql_running" = "1" ]; then
     break
   fi
