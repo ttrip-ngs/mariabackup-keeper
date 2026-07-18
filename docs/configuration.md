@@ -131,7 +131,7 @@ keep = 7
 name = "master-dr"
 type = "ssh"
 host = "db-master.example.com"
-user = "backup"
+user = "mbkbackup"
 path = "/var/backups/mbkeeper/from-replica"
 ssh_key = "/etc/mbkeeper/id_ed25519"
 ssh_options = ["-o", "StrictHostKeyChecking=accept-new"]

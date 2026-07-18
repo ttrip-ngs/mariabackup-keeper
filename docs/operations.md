@@ -75,17 +75,19 @@ setup, run once per acquiring-node/destination-node pair:
    ssh-keygen -t ed25519 -N "" -f /etc/mbkeeper/id_ed25519
    ```
 
-2. On the destination node, create a dedicated `backup` user and restrict
-   its `authorized_keys` entry to only what `mbkeeper` needs:
+2. On the destination node, create a dedicated user and restrict its
+   `authorized_keys` entry to only what `mbkeeper` needs. Avoid naming it
+   plain `backup` -- Debian/Ubuntu already ship a system account with that
+   name (uid/gid 34), and `useradd` will collide with it:
 
    ```bash
-   useradd -m -d /home/backup -s /usr/sbin/nologin backup
-   mkdir -p /home/backup/.ssh /var/backups/mbkeeper
-   chown backup:backup /home/backup/.ssh /var/backups/mbkeeper
+   useradd -m -d /home/mbkbackup -s /usr/sbin/nologin mbkbackup
+   mkdir -p /home/mbkbackup/.ssh /var/backups/mbkeeper
+   chown mbkbackup:mbkbackup /home/mbkbackup/.ssh /var/backups/mbkeeper
    ```
 
-   In `/home/backup/.ssh/authorized_keys`, prefix the key with restrictions
-   -- this account should never get an interactive shell:
+   In `/home/mbkbackup/.ssh/authorized_keys`, prefix the key with
+   restrictions -- this account should never get an interactive shell:
 
    ```
    command="/usr/bin/rrsync /var/backups/mbkeeper",restrict ssh-ed25519 AAAA... acquiring-node
@@ -102,7 +104,7 @@ setup, run once per acquiring-node/destination-node pair:
    name = "master-dr"
    type = "ssh"
    host = "db-master.example.com"
-   user = "backup"
+   user = "mbkbackup"
    path = "/var/backups/mbkeeper"
    ssh_key = "/etc/mbkeeper/id_ed25519"
    ssh_options = ["-o", "StrictHostKeyChecking=accept-new"]
