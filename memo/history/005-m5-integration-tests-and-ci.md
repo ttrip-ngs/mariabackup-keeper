@@ -2,7 +2,10 @@
 
 日付: 2026-07-02
 
-## 重要: この環境では未実行・未検証
+## 重要: 作成当初は未検証(→ 2026-07-18 に Apple Container で検証済み)
+
+**注記**: 下記は作成当初(2026-07-02)の状況。その後 Apple Container で
+3シナリオを実行し成功した。最新の検証結果は「追記(2026-07-18)」節を参照。
 
 **開発環境(このマシン)には Docker デーモンが入っていない**
 (`docker-compose` バイナリはあるが `docker` 本体が無い)ため、以下に書く
@@ -24,6 +27,39 @@ docker-compose 構成・シナリオスクリプトは一度も実行できて�
 - シナリオ 02 で `docker compose stop store` 後の `mbkeeper run` が
   本当に exit code 8 を返すか(ユニットテストでは local destination の
   みでこのパスを検証済みだが、ssh destination 込みの実地検証はこれが初)
+
+## 追記(2026-07-18): Apple Container で検証済み
+
+開発機(Apple Silicon Mac / macOS 26)には Docker デーモンが無いままだが、
+Apple の `container` CLI(1.1.0)が使えるようになったため、Docker Compose
+版とは別に `tests/integration/run-container.sh` を用意して結合試験を実行した。
+CI の正規ハーネス(`run.sh` + Docker Compose)は変更せず温存し、これは
+ローカル専用の二次経路という位置づけ。
+
+MariaDB 11.4 で 3 シナリオ全て成功(exit 0)。上記「未検証項目」の実地確認結果:
+
+- レプリケーション設定(`CHANGE MASTER TO ... START SLAVE` 旧構文)は 11.4 で
+  問題なく確立(`Slave_IO_Running: Yes` / `Slave_SQL_Running: Yes`)
+- `mariadb-backup` パッケージが `mariabackup` 実行ファイルを提供することを確認
+- シナリオ1: primary/restored 双方の `CHECKSUM TABLE` が `409448193` で一致。
+  物理リストアの実効性を実証
+- シナリオ2: 2保管先(local+ssh)で世代一致。store 停止時の再実行が
+  期待どおり **exit code 8**(PARTIAL)を返し、local には新世代が入った。
+  ssh destination 込みの best-effort 継続を実地で初検証
+- シナリオ3: keep=2 で 4 回実行し、生存世代がちょうど 2 つ(最新2つ)に収束
+
+run-container.sh 作成時に必要だった調整(このコミットに含む):
+- `debian:bookworm-slim` は `backup`(uid/gid 34)システムアカウントを持つため
+  保管先ユーザーは `mbkbackup` に改名
+- 読み取り専用マウントのソースツリーからは pip が egg-info を書けず失敗するため、
+  書き込み可能パスへコピーしてからインストール
+- sshd はデーモンを別途 `container exec -d` で起動(compose の常駐前提が無い)
+
+### 残る未検証
+
+- GitHub Actions 上の Docker Compose 版(`run.sh`)の初回実行
+- MariaDB 10.11 マトリクス(古い pip の `--break-system-packages` 非対応
+  フォールバックはコードに入れてあるが、11.4 のみで実行したため未通過)
 
 ## 実装したもの
 

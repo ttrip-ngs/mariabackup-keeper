@@ -19,7 +19,7 @@ keep = 7
 name = "store"
 type = "ssh"
 host = "store"
-user = "backup"
+user = "mbkbackup"
 path = "/backups"
 ssh_key = "/shared-ssh-keys/id_ed25519"
 ssh_options = ["-o", "StrictHostKeyChecking=accept-new"]

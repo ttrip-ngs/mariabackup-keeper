@@ -15,7 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        fi
 
 COPY . /opt/mariabackup-keeper
-RUN pip install --break-system-packages --no-cache-dir /opt/mariabackup-keeper
+# --break-system-packages only exists on pip >= 23.0 (Debian 12/Ubuntu
+# 24.04-era); MariaDB 10.11's image is Ubuntu 22.04, whose python3-pip is
+# older (rejects the unknown flag) and doesn't provide a bare `pip` binary.
+RUN python3 -m pip install --break-system-packages --no-cache-dir /opt/mariabackup-keeper \
+    || python3 -m pip install --no-cache-dir /opt/mariabackup-keeper
 
 COPY tests/integration/docker/replica-entrypoint.sh /usr/local/bin/replica-entrypoint.sh
 RUN chmod +x /usr/local/bin/replica-entrypoint.sh

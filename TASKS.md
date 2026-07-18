@@ -51,9 +51,10 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 - [x] docker-compose.yml(primary/replica/store/restore-target)
 - [x] tests/integration/run.sh、scenarios 3 本
 - [x] .github/workflows/ci.yml(unit + integration マトリクス)
-- [ ] **未検証**: この開発環境に Docker が無く実行できていない。初回の
-      GitHub Actions 実行、またはローカルに Docker が入った環境での
-      `make integration` 実行で動作確認が必要(詳細は memo/history/005 参照)
+- [x] **検証済み(2026-07-18)**: Apple Container(`container` CLI 1.1.0 /
+      macOS 26)向けの `tests/integration/run-container.sh` で結合試験
+      3シナリオを全て実行し成功(MariaDB 11.4)。詳細は memo/history/005 参照。
+      GitHub Actions(Docker Compose 版)での初回実行確認は引き続き必要
 
 ## M6: ドキュメント
 
@@ -62,6 +63,7 @@ mariabackup-keeper の実装タスク一覧。設計は `docs/design.md`(元設�
 
 ## 既知の残課題
 
-- Docker 結合試験(M5)がこの環境では未実行。次回、Docker が使える環境
-  または GitHub Actions 上で最初の実行確認が必要(詳細は
-  memo/history/005 参照)
+- 結合試験(M5)は Apple Container で 3 シナリオ全て検証済み
+  (2026-07-18、MariaDB 11.4)。残るは GitHub Actions 上の Docker Compose
+  版(`tests/integration/run.sh`)での初回実行確認と、MariaDB 10.11
+  マトリクスでの動作確認(詳細は memo/history/005 参照)
